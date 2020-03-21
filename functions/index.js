@@ -50,7 +50,7 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
       console.log('We have a new message in chatroom ', chatroom_id);
 
-      const userTokens = [];
+      var userTokens = [];
       const userInfos = {};
 
       // Get Users in the Chatroom
@@ -60,29 +60,32 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
       );
 
+      const lastMessage = afterData.messages[afterData.messages.length-1];
+
       const results = await Promise.all(getUserRefPromises);
 
       for (let i = 0; i < results.length; i++) {
 
         let doc = results[i];
 
-        console.log('Got user: ',doc.data().uid);
+        console.log('Got user: ', doc.id);
 
-        userInfos[doc.data().uid] = doc.data();
+        userInfos[doc.id] = doc.data();
 
-        if(doc.data().fcmToken) {
+        if(doc.id !== lastMessage.uid && doc.data().fcmToken) {
           userTokens.push(doc.data().fcmToken);
         }
       }
+
+      //remove duplicates
+      userTokens = userTokens.filter((v,i) => userTokens.indexOf(v) === i);
 
       // Check if there are any device tokens
       if (userTokens.length === 0) {
         return console.log('There are no notification tokens to send to.');
       }
 
-      console.log('There are', userTokens.length, 'tokens to send notifications to.');
-
-      const lastMessage = afterData.messages[afterData.messages.length-1];
+      console.log('There are', userTokens.length, 'tokens to send notifications to.');      
 
       var userWhoSent = "";
 
@@ -101,13 +104,18 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
         notification: {
           title: '새 메시지가 있습니다.',
           body: `${userWhoSent}: ${lastMessage.content}`,
-        }
+          click_action : ".ChatActivity"
+        },
+        data : {
+          chatroom_id: chatroom_id, 
+        },
       };
 
       // Send notifications to all tokens.
       const response = await admin.messaging().sendToDevice(userTokens, payload);
       // For each message check if there was an error.
-      /*const tokensToRemove = [];
+
+      const tokensToRemove = [];
 
       response.results.forEach((result, index) => {
         const error = result.error;
@@ -119,7 +127,7 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
             tokensToRemove.push(tokensSnapshot.ref.child(tokens[index]).remove());
           }
         }
-      });*/
+      });
 
-      return;
+      return Promise.all(tokensToRemove);
     });
