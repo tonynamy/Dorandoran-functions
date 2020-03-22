@@ -44,6 +44,12 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
         return console.log('Chatroom ', chatroom_id, 'deleted.');
       }
 
+      //채팅방 유저 나갈 시
+      if(!afterData.users || afterData.users.length === 0) {
+        await change.after.ref.delete();
+        return console.log('Remove chatroom ', chatroom_id, ' because nobody is there.');
+      }
+
       if ( beforeData.messages.length === afterData.messages.length ) { // messages doesn't changed
         return console.log('Chatroom ', chatroom_id, ' info changed.');
       }
