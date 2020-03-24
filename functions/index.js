@@ -110,7 +110,8 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
         notification: {
           title: '새 메시지가 있습니다.',
           body: `${userWhoSent}: ${lastMessage.content}`,
-          click_action : ".ChatActivity"
+          click_action : ".ChatActivity",
+          tag: `"new_message_${chatroom_id}"`
         },
         data : {
           chatroom_id: chatroom_id, 
