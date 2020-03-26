@@ -105,11 +105,19 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
       }
 
+      let messageContent = "";
+
+      if (lastMessage.emoticon) {
+        messageContent = "(이모티콘)";
+      } else {
+        messageContent = lastMessage.content ? lastMessage.content : "알 수 없는 메시지";
+      }
+
       // Notification details.
       const payload = {
         notification: {
           title: '새 메시지가 있습니다.',
-          body: `${userWhoSent}: ${lastMessage.content}`,
+          body: `${userWhoSent}: ${messageContent}`,
           click_action : ".ChatActivity",
           tag: `"new_message_${chatroom_id}"`
         },
