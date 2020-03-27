@@ -50,6 +50,8 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
         return console.log('Remove chatroom ', chatroom_id, ' because nobody is there.');
       }
 
+      if( !beforeData.hasOwnProperty("messages") || !afterData.hasOwnProperty("messages") ) return console.log("There is no messages in this chatroom");
+
       if ( beforeData.messages.length === afterData.messages.length ) { // messages doesn't changed
         return console.log('Chatroom ', chatroom_id, ' info changed.');
       }
@@ -70,6 +72,8 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
       const results = await Promise.all(getUserRefPromises);
 
+      if(!results) console.err("Error while retrieving user refs.");
+
       for (let i = 0; i < results.length; i++) {
 
         let doc = results[i];
@@ -78,7 +82,7 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
         userInfos[doc.id] = doc.data();
 
-        if(doc.id !== lastMessage.uid && doc.data().fcmToken) {
+        if(doc.id !== lastMessage.uid && doc.data().hasOwnProperty("fcmToken") && doc.data().fcmToken) {
           userTokens.push(doc.data().fcmToken);
         }
       }
@@ -135,11 +139,11 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
       response.results.forEach((result, index) => {
         const error = result.error;
         if (error) {
-          console.error('Failure sending notification to', tokens[index], error);
+          console.error('Failure sending notification to', userTokens[index], error);
           // Cleanup the tokens who are not registered anymore.
           if (error.code === 'messaging/invalid-registration-token' ||
               error.code === 'messaging/registration-token-not-registered') {
-            tokensToRemove.push(tokensSnapshot.ref.child(tokens[index]).remove());
+            tokensToRemove.push(tokensSnapshot.ref.child(userTokens[index]).remove());
           }
         }
       });
