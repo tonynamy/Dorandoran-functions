@@ -57,8 +57,7 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
       }
 
       console.log('We have a new message in chatroom ', chatroom_id);
-
-      var userTokens = [];
+      
       const userInfos = {};
 
       // Get Users in the Chatroom
@@ -72,6 +71,10 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
       const results = await Promise.all(getUserRefPromises);
 
+      const userTokens = [];
+      const userTokenPromiseList = [];
+      const userRefTokenMap = [];
+
       if(!results) console.err("Error while retrieving user refs.");
 
       for (let i = 0; i < results.length; i++) {
@@ -82,13 +85,26 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
 
         userInfos[doc.id] = doc.data();
 
-        if(doc.id !== lastMessage.uid && doc.data().hasOwnProperty("fcmToken") && doc.data().fcmToken) {
-          userTokens.push(doc.data().fcmToken);
-        }
+        if(doc.id !== lastMessage.uid)
+          userTokenPromiseList.push(db.collection("fcmTokens").doc(doc.id).get());
       }
 
-      //remove duplicates
-      userTokens = userTokens.filter((v,i) => userTokens.indexOf(v) === i);
+      const userTokenPromiseValues = await Promise.all(userTokenPromiseList)
+
+      for(let i = 0; i < userTokenPromiseValues.length; i++) {
+
+        let userTokenId = userTokenPromiseValues[i].id;
+        let userTokenData = userTokenPromiseValues[i].data();
+
+        if(!userTokenData || !userTokenData.hasOwnProperty("tokens")) continue;
+
+        for (let token in userTokenData.tokens) {
+          
+          userTokens.push(token);
+          userRefTokenMap.push(db.collection("fcmTokens").doc(userTokenId));
+
+        }
+      }
 
       // Check if there are any device tokens
       if (userTokens.length === 0) {
@@ -141,9 +157,13 @@ exports.sendNewMessageNotification = functions.region('asia-northeast1')
         if (error) {
           console.error('Failure sending notification to', userTokens[index], error);
           // Cleanup the tokens who are not registered anymore.
-          if (error.code === 'messaging/invalid-registration-token' ||
-              error.code === 'messaging/registration-token-not-registered') {
-            tokensToRemove.push(tokensSnapshot.ref.child(userTokens[index]).remove());
+          if (error.code === 'messaging/invalid-registration-token' || error.code === 'messaging/registration-token-not-registered') {
+              
+            const removeObject = {tokens: {}};
+            removeObject["tokens"][userTokens[index]] = admin.firestore.FieldValue.delete();
+
+            tokensToRemove.push(userRefTokenMap[index].set(removeObject, { merge: true }));
+
           }
         }
       });
